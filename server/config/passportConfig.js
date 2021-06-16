@@ -1,6 +1,5 @@
 const passport = require('passport');
 const localStrategy = require('passport-local').Strategy;
-const FacebookTokenStrategy = require('passport-facebook-token');
 const mongoose = require('mongoose');
 
 var User = mongoose.model('User');
@@ -25,12 +24,3 @@ passport.use(
         })
 );
 
-passport.use(new FacebookTokenStrategy({
-  clientID: '2412390069072934',
-  clientSecret: 'dca253187e9b89e6741e3c7ab1ddae96'
-},
-function (accessToken, refreshToken, profile, done) {
-  User.upsertFbUser(accessToken, refreshToken, profile, function(err, user) {
-    return done(err, user);
-});
-}));

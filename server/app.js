@@ -6,14 +6,16 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const passport = require('passport');
-const expressJwt = require('express-jwt');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const path = require('path')
+/*const auth = require('./routes/index.router');*/
 
-
+const product = require('./routes/product.router');
 const rtsIndex = require('./routes/index.router');
-var User = require('mongoose').model('User');
+const adminRoute = require('./routes/admin.router');
+
+const webMiddleware = require("./middlewares/web.middleware");
 
 var app = express();
 
@@ -25,10 +27,15 @@ var corsOption = {
 };
 
 // middleware
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors(corsOption));
+app.use(cookieParser('my-secret'));
 app.use(passport.initialize());
+app.use(webMiddleware);
 app.use('/api', rtsIndex);
+app.use('/uploads', express.static(path.join(path.normalize(`${__dirname}/uploads`).replace('\\', '/'))));
+app.use('/api/admin', adminRoute);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -45,76 +52,9 @@ app.use((err, req, res, next) => {
     }
 });
 
-var createToken = function(auth) {
-  return jwt.sign({
-    id: auth.id
-  }, 'my-secret',
-  {
-    expiresIn: 60 * 120
-  });
-};
 
-var generateToken = function (req, res, next) {
-  req.token = createToken(req.auth);
-  next();
-};
-
-var sendToken = function (req, res) {
-  res.setHeader('x-auth-token', req.token);
-  res.status(200).send(req.auth);
-};
-
-router.route('/auth/facebook')
-  .post(passport.authenticate('facebook-token', {session: false}), function(req, res, next) {
-    if (!req.user) {
-      return res.send(401, 'User Not Authenticated');
-    }
-
-    // prepare token for API
-    req.auth = {
-      id: req.user.id
-    };
-
-    next();
-  }, generateToken, sendToken);
-
-//token handling middleware
-var authenticate = expressJwt({
-  secret: 'my-secret',
-  requestProperty: 'auth',
-  getToken: function(req) {
-    if (req.headers['x-auth-token']) {
-      return req.headers['x-auth-token'];
-    }
-    return null;
-  }
-});
-
-var getCurrentUser = function(req, res, next) {
-  User.findById(req.auth.id, function(err, user) {
-    if (err) {
-      next(err);
-    } else {
-      req.user = user;
-      next();
-    }
-  });
-};
-
-var getOne = function (req, res) {
-  var user = req.user.toObject();
-
-  delete user['facebookProvider'];
-  delete user['__v'];
-
-  res.json(user);
-};
-
-router.route('/auth/me')
-  .get(authenticate, getCurrentUser, getOne);
-
-app.use('/api/v1', router);
-
+app.use('/api', router);
+app.use('/product', product);
 
 // start server
-app.listen(process.env.PORT, () => console.log(`Server started at port : ${process.env.PORT}`));
+app.listen(process.env.PORT || 3000, () => console.log(`Server started at port : ${process.env.PORT}`));
